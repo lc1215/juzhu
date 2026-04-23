@@ -1,0 +1,209 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>实验六：基于 ArcGIS Maps SDK for JavaScript 构建美国人口密度专题地图</title>
+
+    <!-- 1. 加载 ArcGIS API for JavaScript 4.x 样式 -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/light/main.css" />
+
+    <style>
+      html, body {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        font-family: "Microsoft YaHei", "SimSun", sans-serif;
+      }
+
+      /* 1) 布局要求：页眉区域 */
+      #header {
+        height: 60px;
+        background-color: #323232;
+        color: white;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        font-size: 20px;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        z-index: 10;
+      }
+
+      #main-container {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        overflow: hidden;
+      }
+
+      /* 1) 布局要求：底图库区域 (侧边栏) */
+      #sidebar {
+        width: 280px;
+        background-color: #f4f4f4;
+        border-right: 1px solid #ccc;
+        display: flex;
+        flex-direction: column;
+        z-index: 5;
+      }
+
+      .sidebar-title {
+        padding: 15px;
+        background-color: #ddd;
+        font-weight: bold;
+        border-bottom: 1px solid #ccc;
+        color: #333;
+      }
+
+      #basemapGalleryDiv {
+        flex: 1;
+        overflow-y: auto;
+        padding: 5px;
+      }
+
+      /* 1) 布局要求：地图区域 */
+      #viewDiv {
+        flex: 1;
+        height: 100%;
+        position: relative;
+      }
+    </style>
+
+    <!-- 2. 加载 ArcGIS API for JavaScript 4.x AMD 脚本 -->
+    <script src="https://js.arcgis.com/4.31/"></script>
+
+    <script>
+      require([
+        "esri/intl",
+        "esri/Map",
+        "esri/views/MapView",
+        "esri/layers/FeatureLayer",
+        "esri/widgets/BasemapGallery",
+        "esri/widgets/ScaleBar",
+        "esri/widgets/Legend",
+        "esri/widgets/Search",
+        "esri/widgets/LayerList",
+        "esri/widgets/Expand"
+      ], function(intl, Map, MapView, FeatureLayer, BasemapGallery, ScaleBar, Legend, Search, LayerList, Expand) {
+        
+        // 设置语言为简体中文
+        intl.setLocale("zh-cn");
+
+        // 3. 创建地图和视图
+        const map = new Map({
+          basemap: "dark-gray-vector" 
+        });
+
+        const view = new MapView({
+          container: "viewDiv",
+          map: map,
+          center: [-98, 39], // 美国地理中心
+          zoom: 4
+        });
+
+        /**
+         * 4. 加载专题图层 (美国人口密度)
+         * 修正：使用该图层 2020 年的正确字段名 POP_SQMI
+         */
+        const popDensityRenderer = {
+          type: "class-breaks",
+          field: "POP_SQMI", // 2020年人口密度字段 (人/平方英里)
+          defaultSymbol: {
+            type: "simple-fill",
+            color: [200, 200, 200, 0.5],
+            outline: { color: [255, 255, 255, 0.2], width: 0.5 }
+          },
+          classBreakInfos: [
+            { minValue: 0, maxValue: 10, symbol: { type: "simple-fill", color: "#fff5f0" }, label: "0 - 10" },
+            { minValue: 10, maxValue: 50, symbol: { type: "simple-fill", color: "#fee0d2" }, label: "10 - 50" },
+            { minValue: 50, maxValue: 100, symbol: { type: "simple-fill", color: "#fcbba1" }, label: "50 - 100" },
+            { minValue: 100, maxValue: 500, symbol: { type: "simple-fill", color: "#fc9272" }, label: "100 - 500" },
+            { minValue: 500, maxValue: 1000, symbol: { type: "simple-fill", color: "#fb6a4a" }, label: "500 - 1000" },
+            { minValue: 1000, maxValue: 5000, symbol: { type: "simple-fill", color: "#ef3b2c" }, label: "1000 - 5000" },
+            { minValue: 5000, maxValue: 1000000, symbol: { type: "simple-fill", color: "#cb181d" }, label: "> 5000" }
+          ]
+        };
+
+        const populationLayer = new FeatureLayer({
+          url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Census_States/FeatureServer/0",
+          title: "美国各州人口密度 (2020)",
+          renderer: popDensityRenderer,
+          outFields: ["*"], // 确保所有字段都被抓取
+          opacity: 0.8,
+          popupTemplate: {
+            title: "{STATE_NAME}",
+            content: [
+              {
+                type: "fields",
+                fieldInfos: [
+                  { fieldName: "POPULATION", label: "2020年总人口", format: { digitSeparator: true } },
+                  { fieldName: "POP_SQMI", label: "人口密度 (人/平方英里)", format: { places: 2 } }
+                ]
+              }
+            ]
+          }
+        });
+
+        map.add(populationLayer);
+
+        // 5. 添加微件：搜索框
+        const searchWidget = new Search({
+          view: view
+        });
+        view.ui.add(searchWidget, "top-right");
+
+        // 6. 添加微件：图层列表
+        const layerList = new LayerList({
+          view: view
+        });
+        const llExpand = new Expand({
+          view: view,
+          content: layerList,
+          expanded: false
+        });
+        view.ui.add(llExpand, "top-right");
+
+        // 7. 添加微件：图例
+        const legend = new Legend({
+          view: view,
+          layerInfos: [{
+            layer: populationLayer,
+            title: "人口密度等级 (人/平方英里)"
+          }]
+        });
+        view.ui.add(legend, "bottom-right");
+
+        // 8. 添加微件：比例尺
+        const scaleBar = new ScaleBar({
+          view: view,
+          unit: "imperial"
+        });
+        view.ui.add(scaleBar, "bottom-left");
+
+        // 9. 侧边栏：底图库
+        const basemapGallery = new BasemapGallery({
+          view: view,
+          container: "basemapGalleryDiv"
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <!-- 1) 页面布局：页眉 -->
+    <div id="header">实验六：构建 WebGIS 应用 (美国人口密度专题)</div>
+
+    <div id="main-container">
+      <!-- 1) 页面布局：底图库区域 (侧边栏) -->
+      <div id="sidebar">
+        <div class="sidebar-title">底图库控制台</div>
+        <div id="basemapGalleryDiv"></div>
+      </div>
+
+      <!-- 1) 页面布局：地图区域 -->
+      <div id="viewDiv"></div>
+    </div>
+  </body>
+</html>
