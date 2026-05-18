@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国革命历史之旅</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        
+        #app-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #header {
+            height: 70px;
+            background: linear-gradient(90deg, #d62828, #c1121f);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 20px;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        #main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        #story-panel {
+            width: 380px;
+            background: #1a1a2e;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #timeline {
+            padding: 15px;
+            background: #16213e;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        #timeline h3 {
+            color: #d62828;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #e0e0e0;
+            font-size: 13px;
+            background: rgba(255,255,255,0.05);
+            transition: all 0.3s;
+        }
+        
+        .timeline-item:hover {
+            background: rgba(214,40,40,0.2);
+        }
+        
+        .timeline-item.active {
+            background: rgba(214,40,40,0.3);
+            color: #d62828;
+            border-left: 3px solid #d62828;
+        }
+        
+        .timeline-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            flex-shrink: 0;
+        }
+        
+        .timeline-item.active .timeline-dot {
+            background: #d62828;
+            box-shadow: 0 0 8px #d62828;
+        }
+        
+        #story-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            color: #e0e0e0;
+        }
+        
+        .story-section {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .story-section.active {
+            display: block;
+        }
+        
+        .story-section h2 {
+            color: #d62828;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .story-section .location {
+            color: #4ecdc4;
+            font-size: 12px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .story-section .time {
+            color: #95e1d3;
+            font-size: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .story-section p {
+            line-height: 1.7;
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        
+        .story-section .highlight {
+            background: rgba(214,40,40,0.2);
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #d62828;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+        
+        .story-section .highlight strong {
+            color: #d62828;
+        }
+        
+        #nav-buttons {
+            padding: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 10px;
+        }
+        
+        #nav-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        #prev-btn {
+            background: rgba(78,205,196,0.2);
+            color: #4ecdc4;
+            border: 1px solid rgba(78,205,196,0.3);
+        }
+        
+        #prev-btn:hover:not(:disabled) {
+            background: #4ecdc4;
+            color: #1a1a2e;
+        }
+        
+        #prev-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        #next-btn {
+            background: linear-gradient(135deg, #d62828, #e63946);
+            color: white;
+        }
+        
+        #next-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(214,40,40,0.4);
+        }
+        
+        #next-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        #map-container {
+            flex: 1;
+            position: relative;
+            background: #16213e;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        #layer-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(26,26,46,0.95);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        
+        #layer-controls h4 {
+            margin-bottom: 12px;
+            color: #d62828;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .layer-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .layer-item:hover {
+            background: rgba(78,205,196,0.2);
+        }
+        
+        .layer-item.active {
+            background: rgba(214,40,40,0.3);
+        }
+        
+        .layer-checkbox {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #4ecdc4;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        .layer-item.active .layer-checkbox {
+            background: #d62828;
+            border-color: #d62828;
+        }
+        
+        .layer-checkbox::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 2px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .layer-item.active .layer-checkbox::after {
+            opacity: 1;
+        }
+        
+        .layer-label {
+            font-size: 13px;
+            color: #e0e0e0;
+        }
+        
+        #map-info {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(26,26,46,0.95);
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            max-width: 280px;
+            z-index: 1000;
+        }
+        
+        #map-info h4 {
+            color: #d62828;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        
+        #map-info p {
+            font-size: 12px;
+            color: #b0b0b0;
+            line-height: 1.5;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            background: #1a1a2e !important;
+            border-radius: 8px !important;
+        }
+        
+        .leaflet-popup-content {
+            color: #e0e0e0 !important;
+            font-size: 14px;
+            margin: 12px !important;
+        }
+        
+        .leaflet-popup-tip {
+            background: #1a1a2e !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="header">
+            <span>中国革命历史之旅</span>
+            <span style="font-size: 12px; font-weight: normal;">从辛亥革命到新中国成立</span>
+        </div>
+        
+        <div id="main-content">
+            <div id="story-panel">
+                <div id="timeline">
+                    <h3>历史时间线</h3>
+                    <div class="timeline-item active" data-section="wuchang">
+                        <div class="timeline-dot"></div>
+                        <span>武昌起义</span>
+                    </div>
+                    <div class="timeline-item" data-section="jinggangshan">
+                        <div class="timeline-dot"></div>
+                        <span>井冈山根据地</span>
+                    </div>
+                    <div class="timeline-item" data-section="changzheng">
+                        <div class="timeline-dot"></div>
+                        <span>长征胜利</span>
+                    </div>
+                    <div class="timeline-item" data-section="yanan">
+                        <div class="timeline-dot"></div>
+                        <span>延安时期</span>
+                    </div>
+                    <div class="timeline-item" data-section="beijing">
+                        <div class="timeline-dot"></div>
+                        <span>新中国成立</span>
+                    </div>
+                </div>
+                
+                <div id="story-content">
+                    <div class="story-section active" id="wuchang-section">
+                        <h2>武昌起义：辛亥革命的枪声</h2>
+                        <div class="location">📍 湖北武汉</div>
+                        <div class="time">⏱️ 1911年10月10日</div>
+                        <p>1911年10月10日夜晚，武昌城内一声枪响，打响了辛亥革命的第一枪。这场由革命党人发动的武装起义，推翻了统治中国两千多年的封建帝制，开启了中国历史的新纪元。</p>
+                        <div class="highlight"><strong>历史意义：</strong>武昌起义标志着辛亥革命的爆发，结束了中国两千多年的君主专制制度，建立了中华民国。</div>
+                        <p>起义军迅速占领武昌城，并成立了湖北军政府。随后，湖南、广东、江苏等十几个省份相继宣布独立，清王朝的统治土崩瓦解。</p>
+                    </div>
+                    
+                    <div class="story-section" id="jinggangshan-section">
+                        <h2>井冈山：革命的摇篮</h2>
+                        <div class="location">📍 江西井冈山</div>
+                        <div class="time">⏱️ 1927年-1930年</div>
+                        <p>1927年10月，毛泽东率领秋收起义部队抵达井冈山，创建了中国第一个农村革命根据地。井冈山道路开辟了"农村包围城市、武装夺取政权"的正确革命道路。</p>
+                        <div class="highlight"><strong>革命精神：</strong>坚定信念、艰苦奋斗、实事求是、敢闯新路、依靠群众、勇于胜利。</div>
+                        <p>井冈山根据地的建立，为中国革命保存了火种，培养了大批优秀的革命干部，为后来的革命斗争奠定了坚实基础。</p>
+                    </div>
+                    
+                    <div class="story-section" id="changzheng-section">
+                        <h2>长征胜利：伟大的远征</h2>
+                        <div class="location">📍 陕西延安</div>
+                        <div class="time">⏱️ 1934年10月-1936年10月</div>
+                        <p>1936年10月，红二、四方面军到达甘肃会宁，与红一方面军胜利会师，标志着长征的胜利结束。长征是人类历史上的伟大壮举，铸就了伟大的长征精神。</p>
+                        <div class="highlight"><strong>长征精神：</strong>不怕牺牲、不畏艰难、团结奋进、革命乐观主义精神。</div>
+                        <p>红军长征行程约二万五千里，跨越14个省，翻越夹金山、梦笔山等40余座海拔4000米以上的雪山，跨过金沙江、大渡河等百条江河，创造了人类历史的奇迹。</p>
+                    </div>
+                    
+                    <div class="story-section" id="yanan-section">
+                        <h2>延安：抗日战争的指挥中心</h2>
+                        <div class="location">📍 陕西延安</div>
+                        <div class="time">⏱️ 1937年-1947年</div>
+                        <p>延安是中国共产党在抗日战争和解放战争时期的指挥中枢。在延安的十年间，中国共产党领导全国人民进行艰苦卓绝的抗日战争，奠定了新中国的基石。</p>
+                        <div class="highlight"><strong>延安精神：</strong>坚定正确的政治方向，解放思想、实事求是的思想路线，全心全意为人民服务的根本宗旨，自力更生、艰苦奋斗的创业精神。</div>
+                        <p>延安时期，中国共产党开展了整风运动，确立了毛泽东思想为党的指导思想，培养了大批革命骨干，为夺取全国胜利做好了充分准备。</p>
+                    </div>
+                    
+                    <div class="story-section" id="beijing-section">
+                        <h2>新中国成立：历史的新纪元</h2>
+                        <div class="location">📍 北京天安门</div>
+                        <div class="time">⏱️ 1949年10月1日</div>
+                        <p>1949年10月1日，毛泽东在天安门城楼上庄严宣告："中华人民共和国中央人民政府今天成立了！"这一历史性时刻，标志着中国人民从此站起来了。</p>
+                        <div class="highlight"><strong>历史意义：</strong>新中国的成立，彻底结束了旧中国半殖民地半封建社会的历史，实现了中国从几千年封建专制政治向人民民主的伟大飞跃。</div>
+                        <p>开国大典上，数十万军民聚集在天安门广场，共同见证了这一伟大时刻。五星红旗在天安门广场上空冉冉升起，中华民族迎来了伟大复兴的光明前景。</p>
+                    </div>
+                </div>
+                
+                <div id="nav-buttons">
+                    <button id="prev-btn" disabled>上一章</button>
+                    <button id="next-btn">下一章</button>
+                </div>
+            </div>
+            
+            <div id="map-container">
+                <div id="map"></div>
+                
+                <div id="layer-controls">
+                    <h4>图层控制</h4>
+                    <div class="layer-item active" data-layer="events">
+                        <div class="layer-checkbox"></div>
+                        <span class="layer-label">历史事件</span>
+                    </div>
+                    <div class="layer-item" data-layer="route">
+                        <div class="layer-checkbox"></div>
+                        <span class="layer-label">长征路线</span>
+                    </div>
+                </div>
+                
+                <div id="map-info">
+                    <h4>🗺️ 探索地图</h4>
+                    <p>缩放、拖动地图来探索中国革命的重要历史地点。点击标记点查看详细信息。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // 初始化地图
+        var map = L.map('map').setView([35.0, 113.5], 5);
+        
+        // 使用高德地图作为底图（更稳定）
+        L.tileLayer('http://webst0{s}.is.autonavi.com/appmaptile?style=7&x={x}&y={y}&z={z}', {
+            subdomains: ['1', '2', '3', '4'],
+            attribution: '© 高德地图'
+        }).addTo(map);
+        
+        // 创建自定义圆形标记
+        function createMarker(lat, lng, name, year, desc) {
+            var marker = L.circleMarker([lat, lng], {
+                radius: 10,
+                fillColor: '#d62828',
+                color: '#ffffff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            
+            marker.bindPopup('<strong>' + name + '</strong><br>年份: ' + year + '<br>' + desc);
+            
+            marker.on('mouseover', function(e) {
+                this.setRadius(14);
+            });
+            
+            marker.on('mouseout', function(e) {
+                this.setRadius(10);
+            });
+            
+            return marker;
+        }
+        
+        // 历史事件数据
+        var eventsData = [
+            { name: "武昌起义", lat: 30.59, lng: 114.31, year: 1911, desc: "辛亥革命爆发，推翻封建帝制" },
+            { name: "井冈山根据地", lat: 26.57, lng: 114.10, year: 1927, desc: "中国第一个农村革命根据地" },
+            { name: "瑞金", lat: 25.89, lng: 116.02, year: 1931, desc: "中华苏维埃共和国首都" },
+            { name: "遵义会议", lat: 27.71, lng: 106.91, year: 1935, desc: "党的历史上生死攸关的转折点" },
+            { name: "延安", lat: 36.56, lng: 109.47, year: 1937, desc: "抗日战争指挥中心" },
+            { name: "西柏坡", lat: 38.24, lng: 114.31, year: 1948, desc: "七届二中全会召开地" },
+            { name: "北京天安门", lat: 39.90, lng: 116.40, year: 1949, desc: "新中国成立典礼" }
+        ];
+        
+        // 添加事件标记
+        eventsData.forEach(function(event) {
+            createMarker(event.lat, event.lng, event.name, event.year, event.desc);
+        });
+        
+        // 长征路线数据
+        var routeCoords = [
+            [25.89, 116.02],   // 瑞金
+            [25.04, 114.85],   // 突破湘江
+            [27.71, 106.91],   // 遵义
+            [26.06, 102.54],   // 四渡赤水
+            [29.20, 103.59],   // 飞夺泸定桥
+            [32.92, 101.71],   // 雪山
+            [33.05, 100.28],   // 草地
+            [36.56, 109.47]    // 延安
+        ];
+        
+        // 创建长征路线
+        var routePolyline = L.polyline(routeCoords, {
+            color: '#d62828',
+            weight: 4,
+            opacity: 0.8,
+            dashArray: '10, 10'
+        });
+        
+        // 章节位置
+        var chapterLocations = {
+            "wuchang": { lat: 30.59, lng: 114.31, zoom: 10 },
+            "jinggangshan": { lat: 26.57, lng: 114.10, zoom: 10 },
+            "changzheng": { lat: 33.0, lng: 108.0, zoom: 6 },
+            "yanan": { lat: 36.56, lng: 109.47, zoom: 10 },
+            "beijing": { lat: 39.90, lng: 116.40, zoom: 10 }
+        };
+        
+        var chapters = ["wuchang", "jinggangshan", "changzheng", "yanan", "beijing"];
+        var currentChapter = 0;
+        
+        function updateChapter(index) {
+            currentChapter = index;
+            
+            document.querySelectorAll('.story-section').forEach(function(el) {
+                el.classList.remove('active');
+            });
+            document.getElementById(chapters[index] + '-section').classList.add('active');
+            
+            document.querySelectorAll('.timeline-item').forEach(function(el) {
+                el.classList.remove('active');
+            });
+            document.querySelector('.timeline-item[data-section="' + chapters[index] + '"]').classList.add('active');
+            
+            document.getElementById('prev-btn').disabled = index === 0;
+            document.getElementById('next-btn').disabled = index === chapters.length - 1;
+            
+            var loc = chapterLocations[chapters[index]];
+            map.flyTo([loc.lat, loc.lng], loc.zoom, { duration: 1.5 });
+        }
+        
+        document.getElementById('next-btn').addEventListener('click', function() {
+            if (currentChapter < chapters.length - 1) {
+                updateChapter(currentChapter + 1);
+            }
+        });
+        
+        document.getElementById('prev-btn').addEventListener('click', function() {
+            if (currentChapter > 0) {
+                updateChapter(currentChapter - 1);
+            }
+        });
+        
+        document.querySelectorAll('.timeline-item').forEach(function(item, index) {
+            item.addEventListener('click', function() {
+                updateChapter(index);
+            });
+        });
+        
+        var routeVisible = false;
+        
+        document.querySelector('.layer-item[data-layer="route"]').addEventListener('click', function() {
+            this.classList.toggle('active');
+            routeVisible = !routeVisible;
+            
+            if (routeVisible) {
+                routePolyline.addTo(map);
+            } else {
+                map.removeLayer(routePolyline);
+            }
+        });
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowRight') {
+                document.getElementById('next-btn').click();
+            } else if (e.key === 'ArrowLeft') {
+                document.getElementById('prev-btn').click();
+            }
+        });
+    </script>
+</body>
+</html>
